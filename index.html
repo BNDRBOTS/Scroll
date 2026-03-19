@@ -1,0 +1,459 @@
+import React, { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const chambers = [
+  {
+    id: "01",
+    step: "Wake",
+    title: "Wake Above the Sea",
+    line: "A suite so good the trip begins before breakfast.",
+    chips: ["cliffside suite", "private terrace", "sunrise service"],
+    tone: "terrace",
+    side: "left",
+    accent: "rgba(230,192,128,0.92)",
+  },
+  {
+    id: "02",
+    step: "Dine",
+    title: "Hold the Table After Hours",
+    line: "Not a room. A host. A table. A night built around you.",
+    chips: ["chef-led dinner", "late seating", "no public room"],
+    tone: "dining",
+    side: "right",
+    accent: "rgba(204,112,76,0.94)",
+  },
+  {
+    id: "03",
+    step: "Unlock",
+    title: "Open the Reserve",
+    line: "The good bottles are never on the first list.",
+    chips: ["rare inventory", "private tasting", "cellar-only access"],
+    tone: "cellar",
+    side: "left",
+    accent: "rgba(145,96,56,0.95)",
+  },
+  {
+    id: "04",
+    step: "Collect",
+    title: "Walk the Story Wing",
+    line: "Make the place memorable enough to retell later.",
+    chips: ["curated collection", "museum lighting", "conversation pieces"],
+    tone: "gallery",
+    side: "right",
+    accent: "rgba(220,188,136,0.92)",
+  },
+  {
+    id: "05",
+    step: "Disappear",
+    title: "Drop into Quiet",
+    line: "Steam, stone, and enough silence to lower the pulse.",
+    chips: ["recovery suite", "water therapy", "total privacy"],
+    tone: "spa",
+    side: "left",
+    accent: "rgba(166,222,229,0.92)",
+  },
+  {
+    id: "06",
+    step: "Depart",
+    title: "Leave Before Sunrise",
+    line: "End with movement. Wheels up. Horizon open.",
+    chips: ["private transfer", "runway priority", "direct inquiry"],
+    tone: "runway",
+    side: "right",
+    accent: "rgba(197,190,246,0.94)",
+  },
+];
+
+function useSmoothScrollProgress(reduceMotion) {
+  const [progress, setProgress] = useState(0);
+  const targetRef = useRef(0);
+  const currentRef = useRef(0);
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    const step = () => {
+      const smoothing = reduceMotion ? 1 : 0.12;
+      const delta = targetRef.current - currentRef.current;
+      const next = reduceMotion ? targetRef.current : currentRef.current + delta * smoothing;
+
+      currentRef.current = next;
+      setProgress(next);
+
+      if (Math.abs(targetRef.current - next) > 0.0005) {
+        rafRef.current = window.requestAnimationFrame(step);
+      } else {
+        currentRef.current = targetRef.current;
+        setProgress(targetRef.current);
+        rafRef.current = 0;
+      }
+    };
+
+    const readProgress = () => {
+      const max = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      targetRef.current = clamp(window.scrollY / max, 0, 1);
+      if (!rafRef.current) rafRef.current = window.requestAnimationFrame(step);
+    };
+
+    readProgress();
+    window.addEventListener("scroll", readProgress, { passive: true });
+    window.addEventListener("resize", readProgress);
+
+    return () => {
+      window.removeEventListener("scroll", readProgress);
+      window.removeEventListener("resize", readProgress);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+    };
+  }, [reduceMotion]);
+
+  return progress;
+}
+
+function SceneBackdrop({ tone, opacity }) {
+  return (
+    <div aria-hidden="true" className={`absolute inset-0 fade-layer ${tone}`} style={{ opacity }}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(7,7,10,0.16)_36%,rgba(7,7,10,0.72)_100%)]" />
+      <div className="absolute inset-0 noise-layer" />
+      <div className="absolute inset-0 vignette-layer" />
+    </div>
+  );
+}
+
+function Portal({ chamber, opacity }) {
+  const placement = chamber.side === "left" ? "left-[3vw] md:left-[5vw]" : "right-[3vw] md:right-[5vw]";
+
+  return (
+    <div
+      aria-hidden="true"
+      className={`absolute ${placement} top-[4svh] h-[92svh] w-[76vw] max-w-[940px] min-w-[320px] fade-layer`}
+      style={{ opacity }}
+    >
+      <div className="absolute inset-0 rounded-[3.5rem] border border-[rgba(255,248,235,0.09)] bg-[rgba(10,10,12,0.04)] shadow-[0_60px_160px_rgba(0,0,0,0.52)]" />
+      <div className="absolute inset-[1.2rem] rounded-[2.8rem] border border-[rgba(255,248,235,0.08)]" />
+      <div className="absolute inset-[2.1rem] overflow-hidden rounded-[2.2rem] border border-[rgba(255,248,235,0.07)] bg-[rgba(10,10,12,0.16)]">
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `radial-gradient(circle at 50% 40%, ${chamber.accent} 0%, transparent 38%), linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.22)), linear-gradient(135deg, rgba(52,42,31,0.26), rgba(15,14,18,0.94))`,
+          }}
+        />
+        <div className="absolute inset-0 portal-sheen" />
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,245,225,0.55),transparent)]" />
+        <div className="absolute inset-[8%] rounded-[1.8rem] border border-[rgba(255,248,235,0.14)]" />
+      </div>
+    </div>
+  );
+}
+
+function SceneObject({ chamber, opacity }) {
+  return (
+    <div aria-hidden="true" className="absolute inset-0 fade-layer" style={{ opacity }}>
+      {chamber.tone === "terrace" && (
+        <>
+          <div className="absolute bottom-[20svh] left-[19vw] h-[12svh] w-[28vw] rounded-[2rem] border border-[rgba(255,248,235,0.11)] bg-[linear-gradient(180deg,rgba(255,248,235,0.14),rgba(255,248,235,0.03))] shadow-[0_30px_90px_rgba(0,0,0,0.3)]" />
+          <div className="absolute bottom-[17svh] left-[16vw] h-[18svh] w-[34vw] rounded-[3rem] border border-[rgba(255,248,235,0.07)]" />
+          <div className="absolute right-[10vw] top-[16svh] h-[16svh] w-[16svh] rounded-full bg-[radial-gradient(circle,rgba(255,231,176,0.42),rgba(255,231,176,0.05)_50%,transparent_70%)]" />
+          <div className="absolute bottom-[24svh] left-[9vw] right-[9vw] h-px bg-[linear-gradient(90deg,transparent,rgba(255,248,235,0.38),transparent)]" />
+        </>
+      )}
+
+      {chamber.tone === "dining" && (
+        <>
+          <div className="absolute bottom-[18svh] left-[14vw] right-[14vw] h-[10svh] rounded-[999px] border border-[rgba(255,248,235,0.1)] bg-[linear-gradient(180deg,rgba(255,248,235,0.1),rgba(255,248,235,0.02))]" />
+          <div className="absolute bottom-[28svh] left-[23vw] h-[12svh] w-[1px] bg-[linear-gradient(180deg,rgba(255,248,235,0),rgba(255,200,160,0.65),rgba(255,248,235,0))]" />
+          <div className="absolute bottom-[28svh] left-[50vw] h-[12svh] w-[1px] bg-[linear-gradient(180deg,rgba(255,248,235,0),rgba(255,200,160,0.65),rgba(255,248,235,0))]" />
+          <div className="absolute bottom-[28svh] right-[23vw] h-[12svh] w-[1px] bg-[linear-gradient(180deg,rgba(255,248,235,0),rgba(255,200,160,0.65),rgba(255,248,235,0))]" />
+          <div className="absolute bottom-[39svh] left-[21.5vw] h-[2svh] w-[2svh] rounded-full bg-[radial-gradient(circle,rgba(255,214,170,0.9),rgba(255,214,170,0.15)_55%,transparent_80%)]" />
+          <div className="absolute bottom-[39svh] left-[48.5vw] h-[2svh] w-[2svh] rounded-full bg-[radial-gradient(circle,rgba(255,214,170,0.9),rgba(255,214,170,0.15)_55%,transparent_80%)]" />
+          <div className="absolute bottom-[39svh] right-[21.5vw] h-[2svh] w-[2svh] rounded-full bg-[radial-gradient(circle,rgba(255,214,170,0.9),rgba(255,214,170,0.15)_55%,transparent_80%)]" />
+        </>
+      )}
+
+      {chamber.tone === "cellar" && (
+        <>
+          <div className="absolute bottom-[18svh] left-[12vw] right-[12vw] top-[16svh] rounded-[3rem] border border-[rgba(255,248,235,0.06)]" />
+          <div className="absolute bottom-[22svh] left-[17vw] right-[17vw] top-[22svh] grid grid-cols-8 gap-3 opacity-70">
+            {Array.from({ length: 24 }).map((_, index) => (
+              <div key={index} className="rounded-full border border-[rgba(255,248,235,0.08)] bg-[linear-gradient(180deg,rgba(255,248,235,0.08),rgba(255,248,235,0.01))]" />
+            ))}
+          </div>
+          <div className="absolute left-[50%] top-[15svh] h-[14svh] w-[40vw] -translate-x-1/2 rounded-b-[50%] border border-[rgba(255,248,235,0.05)]" />
+        </>
+      )}
+
+      {chamber.tone === "gallery" && (
+        <>
+          <div className="absolute left-[16vw] top-[20svh] h-[32svh] w-[16vw] rotate-[-7deg] rounded-[2rem] border border-[rgba(255,248,235,0.1)] bg-[rgba(255,248,235,0.03)] shadow-[0_22px_70px_rgba(0,0,0,0.28)]" />
+          <div className="absolute left-[39vw] top-[15svh] h-[40svh] w-[18vw] rounded-[2rem] border border-[rgba(255,248,235,0.12)] bg-[rgba(255,248,235,0.04)] shadow-[0_28px_80px_rgba(0,0,0,0.32)]" />
+          <div className="absolute right-[16vw] top-[22svh] h-[28svh] w-[15vw] rotate-[6deg] rounded-[2rem] border border-[rgba(255,248,235,0.1)] bg-[rgba(255,248,235,0.03)] shadow-[0_22px_70px_rgba(0,0,0,0.28)]" />
+          <div className="absolute left-[48vw] top-[26svh] h-[10svh] w-[10svh] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,244,210,0.24),rgba(255,244,210,0.02)_58%,transparent_80%)]" />
+        </>
+      )}
+
+      {chamber.tone === "spa" && (
+        <>
+          <div className="absolute bottom-[15svh] left-[17vw] right-[17vw] h-[18svh] rounded-[999px] border border-[rgba(255,248,235,0.1)] bg-[radial-gradient(circle_at_center,rgba(193,239,246,0.18),rgba(193,239,246,0.04)_58%,transparent_90%)] shadow-[0_26px_80px_rgba(0,0,0,0.22)]" />
+          <div className="absolute left-[30vw] top-[14svh] h-[26svh] w-[1px] bg-[linear-gradient(180deg,rgba(255,248,235,0),rgba(190,239,246,0.6),rgba(255,248,235,0))]" />
+          <div className="absolute right-[30vw] top-[14svh] h-[26svh] w-[1px] bg-[linear-gradient(180deg,rgba(255,248,235,0),rgba(190,239,246,0.6),rgba(255,248,235,0))]" />
+          <div className="absolute left-[22vw] right-[22vw] top-[15svh] h-[30svh] rounded-[50%] border border-[rgba(255,248,235,0.05)]" />
+        </>
+      )}
+
+      {chamber.tone === "runway" && (
+        <>
+          <div className="absolute bottom-0 left-1/2 h-[44svh] w-[28vw] -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.04)_8%,rgba(255,255,255,0.08)_100%)] [clip-path:polygon(44%_0%,56%_0%,100%_100%,0%_100%)]" />
+          <div className="absolute bottom-[8svh] left-1/2 h-[1px] w-[40vw] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,248,235,0.4),transparent)]" />
+          <div className="absolute right-[13vw] top-[22svh] h-[8svh] w-[20vw] rounded-[999px] border border-[rgba(255,248,235,0.1)] bg-[linear-gradient(180deg,rgba(255,248,235,0.08),rgba(255,248,235,0.01))]" />
+          <div className="absolute right-[19vw] top-[19svh] h-[5svh] w-[8vw] rounded-[999px] border border-[rgba(255,248,235,0.08)] bg-[rgba(255,248,235,0.03)]" />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChamberCopy({ chamber, opacity, final = false }) {
+  return (
+    <div
+      className={`absolute bottom-[8svh] z-30 max-w-[min(48rem,84vw)] fade-layer ${chamber.side === "left" ? "right-[6vw] text-right" : "left-[6vw] text-left"}`}
+      style={{ opacity }}
+    >
+      <div className="mb-3 text-[0.66rem] uppercase tracking-[0.5em] text-[rgba(255,248,235,0.38)]">
+        {chamber.id} / {chamber.step}
+      </div>
+      <h1 className="display text-[clamp(4.2rem,10vw,10.4rem)] uppercase leading-[0.8] tracking-[0.06em] text-[rgba(255,248,238,0.98)]">
+        {chamber.title}
+      </h1>
+      <p className="mt-5 max-w-[36rem] text-[clamp(1rem,1.8vw,1.18rem)] uppercase tracking-[0.18em] text-[rgba(255,244,220,0.68)]">
+        {chamber.line}
+      </p>
+      <div className={`mt-6 flex flex-wrap gap-3 ${chamber.side === "left" ? "justify-end" : "justify-start"}`}>
+        {chamber.chips.map((chip) => (
+          <span
+            key={chip}
+            className="rounded-full border border-[rgba(255,248,235,0.14)] bg-[rgba(255,248,235,0.03)] px-4 py-2 text-[0.64rem] uppercase tracking-[0.28em] text-[rgba(255,248,235,0.72)]"
+          >
+            {chip}
+          </span>
+        ))}
+      </div>
+      {final && (
+        <div className={`mt-8 flex ${chamber.side === "left" ? "justify-end" : "justify-start"}`}>
+          <button
+            type="button"
+            className="pointer-events-auto rounded-full border border-[rgba(255,248,235,0.24)] px-7 py-3 text-[0.72rem] uppercase tracking-[0.34em] text-[rgba(255,248,238,0.94)] transition hover:border-[rgba(255,248,235,0.46)] hover:bg-[rgba(255,248,235,0.06)]"
+          >
+            Reserve the stay
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProgressList({ activeIndex }) {
+  return (
+    <div className="absolute left-[3vw] top-1/2 z-30 hidden -translate-y-1/2 lg:block" aria-hidden="true">
+      <div className="mb-5 h-[18svh] w-px bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,248,235,0.22),transparent)]" />
+      <div className="flex flex-col gap-2 text-[0.64rem] uppercase tracking-[0.42em] text-[rgba(255,248,235,0.28)]">
+        {chambers.map((chamber, index) => (
+          <span key={chamber.id} className={index === activeIndex ? "text-[rgba(255,248,235,0.94)]" : ""}>
+            {chamber.step}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function EstateOdysseyExperience() {
+  const reduceMotion = useReducedMotion();
+  const scrollProgress = useSmoothScrollProgress(reduceMotion);
+
+  const stageFloat = scrollProgress * chambers.length;
+  const activeIndex = clamp(Math.floor(stageFloat), 0, chambers.length - 1);
+  const localProgress = clamp(stageFloat - activeIndex, 0, 1);
+  const current = chambers[activeIndex];
+  const next = chambers[Math.min(activeIndex + 1, chambers.length - 1)];
+  const hasNext = activeIndex < chambers.length - 1;
+
+  const fade = hasNext ? (reduceMotion ? 1 : clamp((localProgress - 0.16) / 0.64, 0, 1)) : 0;
+  const currentOpacity = hasNext ? 1 - fade : 1;
+  const nextOpacity = hasNext ? fade : 0;
+  const finalGlow = activeIndex === chambers.length - 1 ? clamp((localProgress - 0.3) / 0.55, 0, 1) : 0;
+
+  return (
+    <div className="min-h-[700svh] bg-[#050507] text-[rgba(255,248,238,0.96)]">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+          --text: rgba(255,248,238,0.96);
+          --bg: #050507;
+        }
+
+        html {
+          background: var(--bg);
+          color: var(--text);
+          scroll-behavior: smooth;
+        }
+
+        body {
+          margin: 0;
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Inter', sans-serif;
+        }
+
+        .display {
+          font-family: 'Cormorant Garamond', serif;
+        }
+
+        .fade-layer {
+          will-change: opacity;
+          backface-visibility: hidden;
+        }
+
+        .noise-layer::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          opacity: 0.055;
+          mix-blend-mode: soft-light;
+          background-image:
+            radial-gradient(circle at 18% 24%, rgba(255,255,255,0.85) 0 0.8px, transparent 1px),
+            radial-gradient(circle at 74% 39%, rgba(255,255,255,0.5) 0 0.8px, transparent 1px),
+            radial-gradient(circle at 51% 71%, rgba(255,255,255,0.35) 0 0.8px, transparent 1px);
+          background-size: 26px 26px, 31px 31px, 29px 29px;
+        }
+
+        .vignette-layer {
+          background: radial-gradient(circle at center, transparent 0%, rgba(5,5,7,0.12) 46%, rgba(5,5,7,0.76) 100%);
+        }
+
+        .terrace {
+          background:
+            radial-gradient(circle at 62% 22%, rgba(255,229,169,0.24), transparent 15%),
+            radial-gradient(circle at 53% 69%, rgba(219,190,140,0.36), transparent 24%),
+            linear-gradient(180deg, rgba(244,218,168,0.08), rgba(9,9,11,0.34) 32%, rgba(5,5,7,0.95) 100%),
+            linear-gradient(140deg, rgba(136,111,78,0.42), rgba(18,18,22,0.92) 58%, rgba(7,9,15,1));
+        }
+
+        .dining {
+          background:
+            radial-gradient(circle at 64% 44%, rgba(223,144,100,0.18), transparent 16%),
+            radial-gradient(circle at 48% 65%, rgba(183,96,62,0.2), transparent 24%),
+            linear-gradient(145deg, rgba(61,26,18,0.88), rgba(17,13,16,0.94) 56%, rgba(7,7,10,1));
+        }
+
+        .cellar {
+          background:
+            radial-gradient(circle at 52% 58%, rgba(140,95,58,0.22), transparent 26%),
+            linear-gradient(180deg, rgba(156,116,72,0.08), rgba(14,13,16,0.54) 36%, rgba(5,5,7,1) 100%),
+            linear-gradient(135deg, rgba(51,31,18,0.88), rgba(10,10,12,0.98));
+        }
+
+        .gallery {
+          background:
+            radial-gradient(circle at 50% 56%, rgba(218,186,133,0.16), transparent 24%),
+            linear-gradient(150deg, rgba(30,26,23,0.98), rgba(9,9,12,0.95) 55%, rgba(5,5,7,1));
+        }
+
+        .spa {
+          background:
+            radial-gradient(circle at 50% 62%, rgba(171,230,238,0.18), transparent 23%),
+            linear-gradient(180deg, rgba(160,213,221,0.06), rgba(12,15,18,0.54) 34%, rgba(5,6,8,1) 100%),
+            linear-gradient(145deg, rgba(22,34,39,0.94), rgba(8,9,12,1));
+        }
+
+        .runway {
+          background:
+            radial-gradient(circle at 50% 60%, rgba(188,182,246,0.16), transparent 24%),
+            linear-gradient(180deg, rgba(172,181,235,0.08), rgba(10,11,18,0.42) 38%, rgba(5,5,9,1) 100%),
+            linear-gradient(135deg, rgba(16,18,32,0.98), rgba(6,6,10,1));
+        }
+
+        .portal-sheen {
+          background:
+            linear-gradient(90deg, transparent 0%, rgba(255,248,235,0.06) 18%, transparent 34%, rgba(255,248,235,0.03) 52%, transparent 100%),
+            linear-gradient(180deg, rgba(255,255,255,0.03), transparent 24%, rgba(0,0,0,0.18) 100%);
+        }
+
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,248,235,0.34) rgba(255,255,255,0.03);
+        }
+
+        *::-webkit-scrollbar {
+          width: 10px;
+        }
+
+        *::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.03);
+        }
+
+        *::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(255,248,235,0.48), rgba(255,248,235,0.16));
+          border-radius: 999px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          html {
+            scroll-behavior: auto;
+          }
+        }
+      `}</style>
+
+      <div className="sticky top-0 h-[100svh] overflow-hidden">
+        <SceneBackdrop tone={current.tone} opacity={currentOpacity} />
+        {hasNext && <SceneBackdrop tone={next.tone} opacity={nextOpacity} />}
+
+        <div className="absolute inset-0">
+          <div className="absolute left-1/2 top-[8%] h-[84%] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,248,235,0.14),transparent)] opacity-30" />
+        </div>
+
+        <ProgressList activeIndex={activeIndex} />
+
+        <Portal chamber={current} opacity={currentOpacity} />
+        {hasNext && <Portal chamber={next} opacity={nextOpacity} />}
+
+        <SceneObject chamber={current} opacity={currentOpacity} />
+        {hasNext && <SceneObject chamber={next} opacity={nextOpacity} />}
+
+        <div className="pointer-events-none absolute inset-0 z-20">
+          <div className="absolute left-[6vw] top-[5svh] max-w-[22rem]">
+            <div className="mb-2 text-[0.62rem] uppercase tracking-[0.52em] text-[rgba(255,248,235,0.4)]">Estate Odyssey</div>
+            <div className="text-[0.8rem] uppercase tracking-[0.24em] text-[rgba(255,248,235,0.54)]">
+              scroll turns rooms into reasons to book
+            </div>
+            <div className="mt-3 h-px w-32 bg-[linear-gradient(90deg,rgba(255,248,235,0.5),transparent)]" />
+          </div>
+
+          <ChamberCopy chamber={current} opacity={currentOpacity} final={activeIndex === chambers.length - 1} />
+          {hasNext && <ChamberCopy chamber={next} opacity={nextOpacity} />}
+
+          <div
+            className="absolute bottom-[7svh] left-1/2 -translate-x-1/2 text-[0.62rem] uppercase tracking-[0.46em] text-[rgba(255,248,235,0.32)] fade-layer"
+            style={{ opacity: activeIndex === 0 && localProgress < 0.32 ? 1 : 0 }}
+          >
+            scroll to enter the estate
+          </div>
+        </div>
+
+        <div aria-hidden="true" className="absolute inset-0 z-10 fade-layer" style={{ opacity: finalGlow }}>
+          <div className="absolute inset-x-0 bottom-[-10%] h-[56%] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.26),rgba(211,220,255,0.08)_28%,transparent_62%)]" />
+        </div>
+      </div>
+
+      <main aria-label="Estate odyssey scroll narrative">
+        {Array.from({ length: chambers.length + 1 }).map((_, index) => (
+          <section key={index} className="h-[100svh]" aria-hidden="true" />
+        ))}
+      </main>
+
+      <div className="sr-only" aria-live="polite">
+        {`Currently viewing ${current.title}, chamber ${activeIndex + 1} of ${chambers.length}.`}
+      </div>
+    </div>
+  );
+}
